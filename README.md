@@ -1,6 +1,8 @@
 # Simple Telegram WebApp
 
 A simple click counter web application built as a learning project to practice developing WebApps for Telegram. This project demonstrates the basics of creating interactive Telegram mini-applications with real-time user statistics.
+<img width="484" height="875" alt="image" src="https://github.com/user-attachments/assets/1975d177-f241-46a5-b3cd-922903a962c2" />
+
 
 ## 🎯 About
 
