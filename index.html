@@ -52,6 +52,12 @@
             opacity: 0.9;
         }
         
+        .unique-users {
+            font-size: 1em;
+            margin: 10px 0;
+            opacity: 0.8;
+        }
+        
         .click-button {
             background: linear-gradient(45deg, #ff6b6b, #ee5a52);
             border: none;
@@ -114,12 +120,14 @@
         
         <div class="stats">
             <div class="percentage" id="userPercentage">Your contribution: 0%</div>
+            <div class="unique-users" id="uniqueUsers">Unique players: 0</div>
         </div>
     </div>
 
     <script>
         let totalClicks = 0;
         let userClicks = 0;
+        let uniqueUsers = 0;
         let userId = null;
         
         window.Telegram.WebApp.ready();
@@ -137,6 +145,7 @@
                 const data = await response.json();
                 totalClicks = data.total || 0;
                 userClicks = data.userClicks || 0;
+                uniqueUsers = data.uniqueUsers || 0;
                 updateDisplay();
             } catch (error) {
                 console.error('Error loading stats:', error);
@@ -162,6 +171,7 @@
                 const data = await response.json();
                 totalClicks = data.total;
                 userClicks = data.userClicks;
+                uniqueUsers = data.uniqueUsers;
                 updateDisplay();
                 
             } catch (error) {
@@ -177,6 +187,8 @@
             
             const percentage = totalClicks > 0 ? ((userClicks / totalClicks) * 100).toFixed(1) : 0;
             document.getElementById('userPercentage').textContent = `Your contribution: ${percentage}%`;
+            
+            document.getElementById('uniqueUsers').textContent = `Unique players: ${uniqueUsers}`;
         }
         
         loadStats();
