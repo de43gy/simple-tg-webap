@@ -132,7 +132,8 @@
         
         async function loadStats() {
             try {
-                const response = await fetch('/api/stats');
+                const url = userId ? `/api/stats?userId=${encodeURIComponent(userId)}` : '/api/stats';
+                const response = await fetch(url);
                 const data = await response.json();
                 totalClicks = data.total || 0;
                 userClicks = data.userClicks || 0;

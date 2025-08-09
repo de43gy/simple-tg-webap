@@ -27,8 +27,8 @@ app.get('/', (req, res) => {
 });
 
 app.get('/api/stats', (req, res) => {
+    const userId = req.query.userId;
     const totalQuery = 'SELECT SUM(click_count) as total FROM clicks';
-    const userQuery = 'SELECT click_count FROM clicks WHERE user_id = ?';
     
     db.get(totalQuery, (err, totalRow) => {
         if (err) {
@@ -38,9 +38,24 @@ app.get('/api/stats', (req, res) => {
         
         const total = totalRow ? totalRow.total || 0 : 0;
         
-        res.json({
-            total: total,
-            userClicks: 0
+        if (!userId) {
+            return res.json({
+                total: total,
+                userClicks: 0
+            });
+        }
+        
+        const userQuery = 'SELECT click_count FROM clicks WHERE user_id = ?';
+        db.get(userQuery, [userId], (err, userRow) => {
+            if (err) {
+                console.error('Database error:', err);
+                return res.status(500).json({ error: 'Database error' });
+            }
+            
+            res.json({
+                total: total,
+                userClicks: userRow ? userRow.click_count || 0 : 0
+            });
         });
     });
 });
