@@ -49,11 +49,12 @@ app.get('/api/stats', (req, res) => {
             
             const uniqueUsers = uniqueRow ? uniqueRow.unique_users || 0 : 0;
             
-            if (!userId) {
+            if (!userId || userId.startsWith('demo_')) {
                 return res.json({
                     total: total,
                     userClicks: 0,
-                    uniqueUsers: uniqueUsers
+                    uniqueUsers: uniqueUsers,
+                    userRank: null
                 });
             }
             
@@ -64,10 +65,26 @@ app.get('/api/stats', (req, res) => {
                     return res.status(500).json({ error: 'Database error' });
                 }
                 
-                res.json({
-                    total: total,
-                    userClicks: userRow ? userRow.click_count || 0 : 0,
-                    uniqueUsers: uniqueUsers
+                const userClicks = userRow ? userRow.click_count || 0 : 0;
+                
+                // Calculate user rank among non-demo users
+                const rankQuery = `SELECT COUNT(*) + 1 as rank FROM clicks 
+                                  WHERE click_count > ? AND user_id NOT LIKE "demo_%"`;
+                
+                db.get(rankQuery, [userClicks], (err, rankRow) => {
+                    if (err) {
+                        console.error('Database error:', err);
+                        return res.status(500).json({ error: 'Database error' });
+                    }
+                    
+                    const userRank = rankRow ? rankRow.rank : null;
+                    
+                    res.json({
+                        total: total,
+                        userClicks: userClicks,
+                        uniqueUsers: uniqueUsers,
+                        userRank: userRank
+                    });
                 });
             });
         });
@@ -119,12 +136,29 @@ app.post('/api/click', (req, res) => {
                             return res.status(500).json({ error: 'Database error' });
                         }
                         
-                        db.run('COMMIT');
+                        const userClicksCount = userRow ? userRow.click_count || 0 : 0;
                         
-                        res.json({
-                            total: totalRow ? totalRow.total || 0 : 0,
-                            userClicks: userRow ? userRow.click_count || 0 : 0,
-                            uniqueUsers: uniqueRow ? uniqueRow.unique_users || 0 : 0
+                        // Calculate user rank among non-demo users
+                        const rankQuery = `SELECT COUNT(*) + 1 as rank FROM clicks 
+                                          WHERE click_count > ? AND user_id NOT LIKE "demo_%"`;
+                        
+                        db.get(rankQuery, [userClicksCount], (err, rankRow) => {
+                            if (err) {
+                                console.error('Database error:', err);
+                                db.run('ROLLBACK');
+                                return res.status(500).json({ error: 'Database error' });
+                            }
+                            
+                            db.run('COMMIT');
+                            
+                            const userRank = userId.startsWith('demo_') ? null : (rankRow ? rankRow.rank : null);
+                            
+                            res.json({
+                                total: totalRow ? totalRow.total || 0 : 0,
+                                userClicks: userClicksCount,
+                                uniqueUsers: uniqueRow ? uniqueRow.unique_users || 0 : 0,
+                                userRank: userRank
+                            });
                         });
                     });
                 });
