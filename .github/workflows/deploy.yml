@@ -38,12 +38,29 @@ jobs:
           # Update system packages
           sudo apt update
           
-          # Install Node.js if not installed
+          # Install Node.js and npm if not installed
           if ! command -v node &> /dev/null; then
-            echo "Installing Node.js..."
+            echo "Installing Node.js and npm..."
+            # Try NodeSource repository first
             curl -fsSL https://deb.nodesource.com/setup_18.x | sudo -E bash -
             sudo apt-get install -y nodejs
+            
+            # If that fails, try alternative method
+            if ! command -v node &> /dev/null; then
+              echo "Trying alternative Node.js installation..."
+              sudo apt-get install -y nodejs npm
+            fi
           fi
+          
+          # Install npm separately if it's not available
+          if ! command -v npm &> /dev/null; then
+            echo "Installing npm..."
+            sudo apt-get install -y npm
+          fi
+          
+          # Verify installations
+          echo "Node.js version: $(node --version)"
+          echo "npm version: $(npm --version)"
           
           # Install PM2 globally if not installed
           if ! command -v pm2 &> /dev/null; then
