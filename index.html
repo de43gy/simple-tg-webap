@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Simple TG WebApp</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <style>
+        body {
+            margin: 0;
+            padding: 20px;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background-attachment: fixed;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            color: white;
+        }
+        
+        .container {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            padding: 40px;
+            text-align: center;
+            box-shadow: 0 8px 32px rgba(31, 38, 135, 0.37);
+            border: 1px solid rgba(255, 255, 255, 0.18);
+            max-width: 400px;
+            width: 90%;
+        }
+        
+        h1 {
+            margin-bottom: 30px;
+            font-size: 2em;
+            font-weight: 300;
+        }
+        
+        .counter {
+            font-size: 3em;
+            font-weight: bold;
+            margin: 20px 0;
+            color: #fff;
+            text-shadow: 0 0 20px rgba(255, 255, 255, 0.5);
+        }
+        
+        .percentage {
+            font-size: 1.2em;
+            margin: 20px 0;
+            opacity: 0.9;
+        }
+        
+        .click-button {
+            background: linear-gradient(45deg, #ff6b6b, #ee5a52);
+            border: none;
+            border-radius: 50px;
+            padding: 20px 40px;
+            font-size: 1.3em;
+            color: white;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(238, 90, 82, 0.4);
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        
+        .click-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(238, 90, 82, 0.6);
+        }
+        
+        .click-button:active {
+            transform: translateY(0);
+        }
+        
+        .stats {
+            margin-top: 30px;
+            padding: 20px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+        }
+        
+        .loading {
+            opacity: 0.5;
+            pointer-events: none;
+        }
+        
+        @media (max-width: 480px) {
+            .container {
+                padding: 30px 20px;
+            }
+            .counter {
+                font-size: 2.5em;
+            }
+            .click-button {
+                padding: 15px 30px;
+                font-size: 1.1em;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Click Counter</h1>
+        
+        <div class="counter" id="totalCounter">0</div>
+        
+        <button class="click-button" id="clickButton" onclick="handleClick()">
+            CLICK ME!
+        </button>
+        
+        <div class="stats">
+            <div class="percentage" id="userPercentage">Your contribution: 0%</div>
+        </div>
+    </div>
+
+    <script>
+        let totalClicks = 0;
+        let userClicks = 0;
+        let userId = null;
+        
+        window.Telegram.WebApp.ready();
+        
+        if (window.Telegram.WebApp.initDataUnsafe.user) {
+            userId = window.Telegram.WebApp.initDataUnsafe.user.id;
+        } else {
+            userId = 'demo_' + Math.random().toString(36).substr(2, 9);
+        }
+        
+        async function loadStats() {
+            try {
+                const response = await fetch('/api/stats');
+                const data = await response.json();
+                totalClicks = data.total || 0;
+                userClicks = data.userClicks || 0;
+                updateDisplay();
+            } catch (error) {
+                console.error('Error loading stats:', error);
+            }
+        }
+        
+        async function handleClick() {
+            const button = document.getElementById('clickButton');
+            const container = document.querySelector('.container');
+            
+            button.classList.add('loading');
+            container.classList.add('loading');
+            
+            try {
+                const response = await fetch('/api/click', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ userId: userId })
+                });
+                
+                const data = await response.json();
+                totalClicks = data.total;
+                userClicks = data.userClicks;
+                updateDisplay();
+                
+            } catch (error) {
+                console.error('Error clicking:', error);
+            } finally {
+                button.classList.remove('loading');
+                container.classList.remove('loading');
+            }
+        }
+        
+        function updateDisplay() {
+            document.getElementById('totalCounter').textContent = totalClicks;
+            
+            const percentage = totalClicks > 0 ? ((userClicks / totalClicks) * 100).toFixed(1) : 0;
+            document.getElementById('userPercentage').textContent = `Your contribution: ${percentage}%`;
+        }
+        
+        loadStats();
+        
+        setInterval(loadStats, 5000);
+    </script>
+</body>
+</html>

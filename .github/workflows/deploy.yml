@@ -1,0 +1,129 @@
+name: Deploy to Server
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        cache: 'npm'
+        
+    - name: Install dependencies
+      run: npm ci
+      
+    - name: Create public directory and copy files
+      run: |
+        mkdir -p public
+        cp index.html public/
+        
+    - name: Deploy to server
+      uses: appleboy/ssh-action@v1.0.0
+      with:
+        host: ${{ secrets.LEWD_MONKEY_HOST }}
+        username: ${{ secrets.LEWD_MONKEY_USERNAME }}
+        key: ${{ secrets.LEWD_MONKEY_SSH_KEY }}
+        port: ${{ secrets.LEWD_MONKEY_SSH_PORT }}
+        script: |
+          # Update system packages
+          sudo apt update
+          
+          # Install Node.js if not installed
+          if ! command -v node &> /dev/null; then
+            echo "Installing Node.js..."
+            curl -fsSL https://deb.nodesource.com/setup_18.x | sudo -E bash -
+            sudo apt-get install -y nodejs
+          fi
+          
+          # Install PM2 globally if not installed
+          if ! command -v pm2 &> /dev/null; then
+            echo "Installing PM2..."
+            sudo npm install -g pm2
+          fi
+          
+          # Create application directory structure
+          sudo mkdir -p /opt/webapps
+          sudo chown $USER:$USER /opt/webapps
+          
+          # Create log directory for PM2
+          sudo mkdir -p /var/log/pm2
+          sudo chown $USER:$USER /var/log/pm2
+          
+          # Clone or update repository
+          if [ ! -d "/opt/webapps/simple-tg-webapp" ]; then
+            echo "Cloning repository..."
+            cd /opt/webapps
+            git clone https://github.com/${{ github.repository }}.git simple-tg-webapp
+          else
+            echo "Updating repository..."
+            cd /opt/webapps/simple-tg-webapp
+            git fetch origin
+            git reset --hard origin/main
+          fi
+          
+          # Navigate to app directory
+          cd /opt/webapps/simple-tg-webapp
+          
+          # Install production dependencies
+          npm ci --production
+          
+          # Create public directory and copy HTML
+          mkdir -p public
+          cp index.html public/
+          
+          # Create PM2 ecosystem config if it doesn't exist
+          if [ ! -f "ecosystem.config.js" ]; then
+            echo "Creating PM2 ecosystem config..."
+            cat > ecosystem.config.js << 'EOF'
+          module.exports = {
+            apps: [{
+              name: 'simple-tg-webapp',
+              script: 'server.js',
+              cwd: '/opt/webapps/simple-tg-webapp',
+              instances: 1,
+              exec_mode: 'fork',
+              env: {
+                NODE_ENV: 'production',
+                PORT: 3000
+              },
+              error_file: '/var/log/pm2/simple-tg-webapp-error.log',
+              out_file: '/var/log/pm2/simple-tg-webapp-out.log',
+              log_file: '/var/log/pm2/simple-tg-webapp.log',
+              time: true
+            }]
+          }
+          EOF
+          fi
+          
+          # Start or restart application with PM2
+          if pm2 list | grep -q "simple-tg-webapp"; then
+            echo "Restarting application..."
+            pm2 restart simple-tg-webapp
+          else
+            echo "Starting application..."
+            pm2 start ecosystem.config.js
+          fi
+          
+          # Save PM2 configuration and setup startup
+          pm2 save
+          
+          # Setup PM2 startup (only if not already done)
+          if ! systemctl is-enabled pm2-$USER &> /dev/null; then
+            echo "Setting up PM2 startup..."
+            pm2 startup systemd -u $USER --hp $HOME
+            sudo env PATH=$PATH:/usr/bin /usr/lib/node_modules/pm2/bin/pm2 startup systemd -u $USER --hp $HOME
+          fi
+          
+          echo "Deployment completed successfully!"
+          echo "Application is running on port 3000"
+          pm2 status
