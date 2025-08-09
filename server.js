@@ -8,6 +8,7 @@ const PORT = process.env.PORT || 3000;
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
+// Database setup
 const db = new sqlite3.Database('./clicks.db');
 
 db.serialize(() => {
@@ -22,6 +23,7 @@ db.serialize(() => {
     db.run(`CREATE UNIQUE INDEX IF NOT EXISTS idx_user_id ON clicks(user_id)`);
 });
 
+// Routes
 app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
@@ -109,6 +111,7 @@ app.post('/api/click', (req, res) => {
     });
 });
 
+// Graceful shutdown
 process.on('SIGINT', () => {
     console.log('\nShutting down gracefully...');
     db.close((err) => {

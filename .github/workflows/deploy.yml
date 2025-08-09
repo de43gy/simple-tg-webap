@@ -30,77 +30,51 @@ jobs:
     - name: Deploy to server
       uses: appleboy/ssh-action@v1.0.0
       with:
-        host: ${{ secrets.LEWD_MONKEY_HOST }}
-        username: ${{ secrets.LEWD_MONKEY_USERNAME }}
-        key: ${{ secrets.LEWD_MONKEY_SSH_KEY }}
-        port: ${{ secrets.LEWD_MONKEY_SSH_PORT }}
+        host: ${{ secrets.HOST }}
+        username: ${{ secrets.USERNAME }}
+        key: ${{ secrets.SSH_KEY }}
+        port: ${{ secrets.SSH_PORT }}
         script: |
-          # Update system packages
           sudo apt update
           
-          # Install Node.js and npm if not installed
           if ! command -v node &> /dev/null; then
-            echo "Installing Node.js and npm..."
-            # Try NodeSource repository first
             curl -fsSL https://deb.nodesource.com/setup_18.x | sudo -E bash -
             sudo apt-get install -y nodejs
             
-            # If that fails, try alternative method
             if ! command -v node &> /dev/null; then
-              echo "Trying alternative Node.js installation..."
               sudo apt-get install -y nodejs npm
             fi
           fi
           
-          # Install npm separately if it's not available
           if ! command -v npm &> /dev/null; then
-            echo "Installing npm..."
             sudo apt-get install -y npm
           fi
           
-          # Verify installations
-          echo "Node.js version: $(node --version)"
-          echo "npm version: $(npm --version)"
-          
-          # Install PM2 globally if not installed
           if ! command -v pm2 &> /dev/null; then
-            echo "Installing PM2..."
             sudo npm install -g pm2
           fi
           
-          # Create application directory structure
           sudo mkdir -p /opt/webapps
           sudo chown $USER:$USER /opt/webapps
           
-          # Create log directory for PM2
           sudo mkdir -p /var/log/pm2
           sudo chown $USER:$USER /var/log/pm2
           
-          # Clone or update repository
           if [ ! -d "/opt/webapps/simple-tg-webapp" ]; then
-            echo "Cloning repository..."
             cd /opt/webapps
             git clone https://github.com/${{ github.repository }}.git simple-tg-webapp
           else
-            echo "Updating repository..."
             cd /opt/webapps/simple-tg-webapp
             git fetch origin
             git reset --hard origin/main
           fi
           
-          # Navigate to app directory
           cd /opt/webapps/simple-tg-webapp
-          
-          # Install production dependencies
           npm ci --production
-          
-          # Create public directory and copy HTML
           mkdir -p public
           cp index.html public/
           
-          # Create PM2 ecosystem config if it doesn't exist
           if [ ! -f "ecosystem.config.js" ]; then
-            echo "Creating PM2 ecosystem config..."
             cat > ecosystem.config.js << 'EOF'
           module.exports = {
             apps: [{
@@ -122,25 +96,15 @@ jobs:
           EOF
           fi
           
-          # Start or restart application with PM2
           if pm2 list | grep -q "simple-tg-webapp"; then
-            echo "Restarting application..."
             pm2 restart simple-tg-webapp
           else
-            echo "Starting application..."
             pm2 start ecosystem.config.js
           fi
           
-          # Save PM2 configuration and setup startup
           pm2 save
           
-          # Setup PM2 startup (only if not already done)
           if ! systemctl is-enabled pm2-$USER &> /dev/null; then
-            echo "Setting up PM2 startup..."
             pm2 startup systemd -u $USER --hp $HOME
             sudo env PATH=$PATH:/usr/bin /usr/lib/node_modules/pm2/bin/pm2 startup systemd -u $USER --hp $HOME
           fi
-          
-          echo "Deployment completed successfully!"
-          echo "Application is running on port 3000"
-          pm2 status
