@@ -49,7 +49,7 @@ app.get('/api/stats', (req, res) => {
             
             const uniqueUsers = uniqueRow ? uniqueRow.unique_users || 0 : 0;
             
-            if (!userId || userId.startsWith('demo_')) {
+            if (!userId || (userId && String(userId).startsWith('demo_'))) {
                 return res.json({
                     total: total,
                     userClicks: 0,
@@ -151,7 +151,7 @@ app.post('/api/click', (req, res) => {
                             
                             db.run('COMMIT');
                             
-                            const userRank = userId.startsWith('demo_') ? null : (rankRow ? rankRow.rank : null);
+                            const userRank = (userId && String(userId).startsWith('demo_')) ? null : (rankRow ? rankRow.rank : null);
                             
                             res.json({
                                 total: totalRow ? totalRow.total || 0 : 0,
